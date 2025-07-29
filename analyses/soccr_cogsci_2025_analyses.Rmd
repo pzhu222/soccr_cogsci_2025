@@ -1,0 +1,224 @@
+---
+title: "soccr_cogsci_2025_analyses"
+output: html_document
+date: "2025-07-29"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+#load in packages
+
+#install packages if do not have them, do this in a vector
+
+required_packages <- c("here", "tidyverse", "rstanarm", "bridgesampling", 
+                        "BFpack", "dplyr", "boot", "readr", "knitr", 
+                        "broom", "wesanderson")
+
+#check if packages are installed, if not install them
+
+new_packages <- required_packages[!(required_packages %in% installed.packages()[,"Package"])]
+
+if(length(new_packages)) {
+  install.packages(new_packages)
+}
+
+#load packages
+library(here)
+library(tidyverse)
+library(rstanarm)
+library(bridgesampling)
+library(BFpack)
+
+```
+
+# Experiment 1
+
+## Load in and clean data
+```{r}
+# Load in the data
+
+df.soccr_study1_raw <- read.csv(here("data/soccr_study1.csv"), header = T)
+
+df.soccr_study1 <- df.soccr_study1_raw |> 
+  filter(exclude. == 0) |> 
+  mutate(condition = ifelse(Condition == 0, "Miss", "Almost")) |> 
+  select(condition,
+         choice = Choice,
+         id,
+         age)
+
+df.soccr_study1 |> 
+  group_by(condition, choice) |>  
+  summarize(n = n())
+
+```
+
+## Get mean and sd of age
+
+```{r}
+
+mean_age <- mean(df.soccr_study1$age, na.rm = TRUE)
+
+sd_age <- sd(df.soccr_study1$age, na.rm = TRUE)
+
+# Print mean and sd of age
+cat("Mean age:", mean_age, "\n")
+cat("Standard deviation of age:", sd_age, "\n")
+
+```
+
+## Make plot
+
+```{r fig.height = 6, fig.width = 8}
+custom_colors <- c("Almost" = "#56C1FF", "Miss" = "#FF8A5B")
+
+p.soccr1 <- ggplot(data = df.soccr_study1, 
+                             aes(x = condition, 
+                                 y = choice, 
+                                 color = condition)) +
+  geom_jitter(width = .35, height = 0, size = 4.5, alpha = 0.4) + 
+  stat_summary(
+    geom = "pointrange",
+    fun.data = "mean_cl_boot",
+    size = 2,
+    linewidth = 2) +
+  theme_classic(base_family = "Noto Sans Korean", 
+                base_size = 32) +
+  # geom_hline(yintercept = 0.5, linetype = "dashed") +
+  labs(x = "", y = "Prop. Choosing Same Game") +
+  scale_x_discrete(breaks = c("Condition", "Choice")) +
+  scale_color_manual(values = custom_colors) +
+  theme(legend.position = "none", 
+        axis.title.x = element_text(size = 25),  
+        # X-axis title font settings
+    axis.title.y = element_text(size = 28),  
+    # Y-axis title font settings
+    axis.text.x = element_text(size = 28),
+    axis.text.y = element_text(size = 20)) +
+  #make the y axis title a little bit further away from the labels
+  theme(axis.title.y = element_text(margin = margin(r = 10))) +
+  # theme(plot.background = element_rect(fill = "#E6E2D9", color = NA),
+  #       panel.background = element_rect(fill = "#E6E2D9", color = NA)) +
+  scale_x_discrete(labels = c("Almost" = "Almost", "Miss" = "Miss"))
+
+ggsave(here("figs", "soccr1_plot.jpg"), 
+       plot = p.soccr1, 
+       width = 8, height = 5, dpi = 300, 
+       device = "jpg", 
+       units = "in")
+
+```
+
+## Analyze study 1 data
+
+```{r}
+
+soccr_study1_model_full <-
+  stan_glm(
+    choice ~ condition,
+    data = df.soccr_study1,
+    family = binomial,
+    refresh = 0,
+    diagnostic_file = here("diagnostic_files", "diag_file_full_soccr_study1.csv")
+  )
+
+soccr_study1_model_null <-
+  stan_glm(
+    choice ~ 1,
+    data = df.soccr_study1,
+    family = binomial,
+    refresh = 0,
+    diagnostic_file = here("diagnostic_files", "diag_file_null_soccr_study1.csv")
+  )
+
+bridge_full_soccr_study1 <- bridge_sampler(soccr_study1_model_full)
+bridge_null_soccr_study1 <- bridge_sampler(soccr_study1_model_null)
+
+bayes_factor(bridge_full_soccr_study1, bridge_null_soccr_study1)$bf
+
+df.soccr_study1_fisher <- table(df.soccr_study1$condition, df.soccr_study1$choice)
+
+fisher.test(df.soccr_study1_fisher)
+
+```
+
+# Study 2
+
+## Read in data
+```{r}
+
+df.soccr_study2_raw <- read.csv(here("data", "soccr_study2_pilot.csv"), header = T)
+
+df.soccr_study2 <- df.soccr_study2_raw |> 
+  filter(exclude. == 0) |> 
+  mutate(condition = ifelse(Condition == 0, "Hinderer", "Helper")) |> 
+  select(condition,
+         choice = Choice,
+         id,
+         age)
+
+df.soccr_study2 |> 
+  group_by(condition, choice) |>  
+  summarize(n = n())
+
+```
+
+## Get mean and sd of age
+```{r}
+
+mean_age_study2 <- mean(df.soccr_study2$age, na.rm = TRUE)
+
+sd_age_study2 <- sd(df.soccr_study2$age, na.rm = TRUE)
+
+# Print mean and sd of age
+
+cat("Mean age of study 2:", mean_age_study2, "\n")
+
+cat("Standard deviation of age of study 2:", sd_age_study2, "\n")
+
+```
+
+## Make plot
+
+```{r}
+
+custom_colors_study2 <- c("Helper" = "#56C1FF", "Hinderer" = "#FF8A5B")
+
+p.soccr2 <- ggplot(data = df.soccr_study2, 
+                             aes(x = condition, 
+                                 y = choice, 
+                                 color = condition)) +
+  geom_jitter(width = .35, height = 0, size = 4.5, alpha = 0.4) + 
+  stat_summary(
+    geom = "pointrange",
+    fun.data = "mean_cl_boot",
+    size = 2,
+    linewidth = 2) +
+  theme_classic(base_family = "Noto Sans Korean", 
+                base_size = 32) +
+  # geom_hline(yintercept = 0.5, linetype = "dashed") +
+  labs(x = "", y = "Prop. Keeping Gazorp") +
+  scale_x_discrete(breaks = c("Condition", "Choice")) +
+  scale_color_manual(values = custom_colors_study2) +
+  theme(legend.position = "none", 
+        axis.title.x = element_text(size = 25),  
+        # X-axis title font settings
+    axis.title.y = element_text(size = 28),  
+    # Y-axis title font settings
+    axis.text.x = element_text(size = 28),
+    axis.text.y = element_text(size = 20)) +
+  #make the y axis title a little bit further away from the labels
+  theme(axis.title.y = element_text(margin = margin(r = 10))) +
+  # theme(plot.background = element_rect(fill = "#E6E2D9", color = NA),
+  #       panel.background = element_rect(fill = "#E6E2D9", color = NA)) +
+  scale_x_discrete(labels = c("Helper"= "Helper", "Hinderer"= "Hinderer"))
+
+ggsave(here("figs", "soccr2_plot.jpg"), 
+       plot = p.soccr2, 
+       width = 8, height = 5, dpi = 300, 
+       device = "jpg", 
+       units = "in")
+
+```
+
