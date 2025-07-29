@@ -9,21 +9,6 @@ knitr::opts_chunk$set(echo = TRUE)
 
 #load in packages
 
-#install packages if do not have them, do this in a vector
-
-required_packages <- c("here", "tidyverse", "rstanarm", "bridgesampling", 
-                        "BFpack", "dplyr", "boot", "readr", "knitr", 
-                        "broom", "wesanderson")
-
-#check if packages are installed, if not install them
-
-new_packages <- required_packages[!(required_packages %in% installed.packages()[,"Package"])]
-
-if(length(new_packages)) {
-  install.packages(new_packages)
-}
-
-#load packages
 library(here)
 library(tidyverse)
 library(rstanarm)
